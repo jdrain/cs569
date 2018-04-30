@@ -1,0 +1,7 @@
+/home/jason/school/cs569/programs/assignment2/build/CMakeFiles/edit_cache.dir
+/home/jason/school/cs569/programs/assignment2/build/CMakeFiles/jacobi.dir
+/home/jason/school/cs569/programs/assignment2/build/CMakeFiles/rebuild_cache.dir
+/home/jason/school/cs569/programs/assignment2/build/CMakeFiles/mm.dir
+/home/jason/school/cs569/programs/assignment2/build/CMakeFiles/matvec.dir
+/home/jason/school/cs569/programs/assignment2/build/CMakeFiles/Smoothing.dir
+/home/jason/school/cs569/programs/assignment2/build/CMakeFiles/Histogram.dir

@@ -1,0 +1,22 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/jason/school/cs569/programs/assignment1/JasonDrain/mm.c
+stdio.h
+-
+stdlib.h
+-
+math.h
+-
+string.h
+-
+sys/timeb.h
+-
+omp.h
+-
+

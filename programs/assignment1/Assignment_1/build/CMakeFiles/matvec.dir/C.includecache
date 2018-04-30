@@ -1,0 +1,20 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/jason/school/cs569/programs/assignment1/Assignment_1/matvec.c
+stdio.h
+-
+stdlib.h
+-
+math.h
+-
+sys/timeb.h
+-
+string.h
+-
+

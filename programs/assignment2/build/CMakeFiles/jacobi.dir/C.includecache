@@ -1,0 +1,22 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/jason/school/cs569/programs/assignment2/jacobi.c
+stdio.h
+-
+stdlib.h
+-
+string.h
+-
+math.h
+-
+omp.h
+-
+sys/timeb.h
+-
+

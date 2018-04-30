@@ -1,0 +1,1 @@
+/usr/bin/cc   -fopenmp    CMakeFiles/jacobi.dir/jacobi.c.o  -o jacobi -rdynamic -lm 

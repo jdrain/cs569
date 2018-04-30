@@ -1,0 +1,1 @@
+/usr/bin/cc   -fopenmp    CMakeFiles/mm.dir/mm.c.o  -o mm -rdynamic 
