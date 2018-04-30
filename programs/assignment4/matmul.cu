@@ -171,18 +171,21 @@ __global__ void matmul_cuda_v1_vanilla_kernel(int N, REAL *A, REAL *B, REAL *C )
 void matmul_cuda_v1_vanilla(int N, REAL *A, REAL *B, REAL *C) {
 
     // Copy A to device memory
-    const REAL d_A;
+    REAL * d_A;
     int size = N * N * sizeof(float);
+    d_A = malloc(size);
     cudaMalloc(&d_A, size);
     cudaMemcpy(d_A, A, size, cudaMemcpyHostToDevice);
 
     // Copy B to device memory
-    const REAL d_B;
+    REAL * d_B;
+    d_B = malloc(size);
     cudaMalloc(&d_B, size);
     cudaMemcpy(d_B, B, size, cudaMemcpyHostToDevice);
 
     // Malloc for C
-    const REAL d_C;
+    REAL * d_C;
+    d_C = malloc(size);
     cudaMalloc(&d_C, size);
 
     // Invoke kernel function
@@ -276,18 +279,18 @@ __global__ void matmul_cuda_v1_shmem_kernel( int N, REAL *A, REAL *B, REAL *C ) 
 void matmul_cuda_v1_shmem(int N, REAL *A, REAL *B, REAL *C) {
 
     // Copy A to device memory
-    const REAL d_A;
+    REAL * d_A;
     int size = N * N * sizeof( REAL );
     cudaMalloc(&d_A, size);
     cudaMemcpy(d_A, A, size, cudaMemcpyHostToDevice);
 
     // Copy B to device memory
-    const REAL d_B;
+    REAL * d_B;
     cudaMalloc(&d_B, size);
     cudaMemcpy(d_B, B, size, cudaMemcpyHostToDevice);
 
     // Malloc for C
-    const REAL d_C;
+    REAL * d_C;
     cudaMalloc(&d_C, size);
 
     // Invoke kernel function
@@ -314,18 +317,18 @@ void matmul_cuda_v1_cublas(int N, REAL *A, REAL *B, REAL *C) {
     REAL alpha, beta = 1.0;
 
     // Copy A to device memory
-    const REAL d_A;
+    REAL * d_A;
     int size = N * N * sizeof( REAL );
     cudaMalloc(&d_A, size);
     cudaMemcpy(d_A, A, size, cudaMemcpyHostToDevice);
 
     // Copy B to device memory
-    const REAL d_B;
+    REAL * d_B;
     cudaMalloc(&d_B, size);
     cudaMemcpy(d_B, B, size, cudaMemcpyHostToDevice);
 
     // Malloc for C
-    const REAL d_C;
+    REAL * d_C;
     cudaMalloc(&d_C, size);
 
     cublasSgemm(cublas_handle, CUBLAS_OP_N, CUBLAS_OP_N, 
