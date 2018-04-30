@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
 
     //TODO: call and time for matmul_cuda_v1_shmem(int N, REAL *A, REAL *B, REAL *C);
     elapsed_cuda_v2 = read_timer();
-    matmul_cuda_v2_shmem(N, A, B, C_cuda_shmem);
+    matmul_cuda_v1_shmem(N, A, B, C_cuda_shmem);
     elapsed_cuda_v2 = read_timer() - elapsed_cuda_v2;
 
     //TODO: call and time for matmul_cuda_v1_cublas(int N, REAL *A, REAL *B, REAL *C);
@@ -155,7 +155,7 @@ void matmul_openmp(int N, REAL *A, REAL *B, REAL *C, int num_tasks) {
 /** 
   * TODO: kernel implementation 
   */
-__global__ void matmul_cuda_v1_vanilla_kernel( REAL *A, REAL *B, REAL *C ) {
+__global__ void matmul_cuda_v1_vanilla_kernel(int N, REAL *A, REAL *B, REAL *C ) {
     float C_val = 0.0;
     int row = BlockIdx.y * BlockDim.y + ThreadIdx.y;
     int col = BlockIdx.x * BlockDim.x + ThreadIdx.x;
@@ -188,7 +188,7 @@ void matmul_cuda_v1_vanilla(int N, REAL *A, REAL *B, REAL *C) {
     // Invoke kernel function
     dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
     dim3 dimGrid(N / dimBlock.x, N / dimBlock.y);
-    matmul_cuda_v1_vanilla_kernel<<<dimGrid, dimBlock>>>(d_A, d_B, d_C);
+    matmul_cuda_v1_vanilla_kernel<<<dimGrid, dimBlock>>>(N, d_A, d_B, d_C);
     
     cudaMemcpy(C, d_C, size, cudaMemcpyDeviceToHost);
 
@@ -215,7 +215,7 @@ __device__ REAL GetElement( REAL *A, int row, int col, int width ) {
 /** 
   * TODO: kernel implementation 
   */
-__global__ void matmul_cuda_v2_shmem_kernel( REAL *A, REAL *B, REAL *C ) {
+__global__ void matmul_cuda_v1_shmem_kernel( int N, REAL *A, REAL *B, REAL *C ) {
     // Block row and column
     int blockRow = blockIdx.y;
     int blockCol = blockIdx.x;
@@ -273,7 +273,7 @@ __global__ void matmul_cuda_v2_shmem_kernel( REAL *A, REAL *B, REAL *C ) {
 /*
  * call to kernel that use GPU shared memory
  */
-void matmul_cuda_v2_shmem(int N, REAL *A, REAL *B, REAL *C) {
+void matmul_cuda_v1_shmem(int N, REAL *A, REAL *B, REAL *C) {
 
     // Copy A to device memory
     const REAL d_A;
@@ -293,7 +293,7 @@ void matmul_cuda_v2_shmem(int N, REAL *A, REAL *B, REAL *C) {
     // Invoke kernel function
     dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
     dim3 dimGrid(N/ dimBlock.x, N / dimBlock.y);
-    matmul_cuda_v2_shmem_kernel<<<dimGrid, dimBlock>>>(d_A, d_B, d_C);
+    matmul_cuda_v1_shmem_kernel<<<dimGrid, dimBlock>>>(N, d_A, d_B, d_C);
 
     // Copy data back to host
     cudaMemcpy(C, d_C, size, cudaMemcpyDeviceToHost);
@@ -310,7 +310,7 @@ void matmul_cuda_v2_shmem(int N, REAL *A, REAL *B, REAL *C) {
  // cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, 
  //             matrix_size.uiWB, matrix_size.uiHA, matrix_size.uiWA, &alpha, d_B, matrix_size.uiWB, d_A,
  //             matrix_size.uiWA, &beta, d_C, matrix_size.uiWA)
-void matmul_cuda_v3_cublas(int N, REAL *A, REAL *B, REAL *C) {
+void matmul_cuda_v1_cublas(int N, REAL *A, REAL *B, REAL *C) {
     REAL alpha, beta = 1.0;
 
     // Copy A to device memory
