@@ -282,28 +282,28 @@ void jacobi_seq(long n, long m, REAL dx, REAL dy, REAL alpha, REAL omega, REAL *
  }
 */
 
-__global__ void jacobi_kernel(long n, long m, REAL ax, REAL ay, REAL b, REAL omega, REAL * u, REAL * f, float * resid) {
+__global__ void jacobi_kernel(long n, long m, REAL ax, REAL ay, REAL b, REAL omega, REAL * u, REAL * f, float * resid, float * d_error) {
 	for ( int i = 1; i < (n - 1); i++ ) {
 	    for ( int j = 1; j < (m - 1); j++ ) {
 			// do stuff
 			resid = (ax * (uold[i - 1][j] + uold[i + 1][j]) + ay * (uold[i][j - 1] + uold[i][j + 1]) + b * uold[i][j] - f[i][j]) / b;
 	
 			u[i][j] = uold[i][j] - omega * resid;
-			error = error + resid * resid;
+			d_error = atomicAdd_system(&d_error, resid * resid);
 		}
 	}
 }
 
 void jacobi_cuda(long n, long m, REAL dx, REAL dy, REAL alpha, REAL omega, REAL * u_p, REAL * f_p, REAL tol, int mits) {
 	long i, j, k;
-	REAL error;
 	REAL ax;
 	REAL ay;
 	REAL b;
 	REAL resid;
 	REAL uold[n][m];
     REAL (*u)[m] = (REAL(*)[m])u_p;
-    REAL (*f)[m] = (REAL(*)[m])f_p;
+	REAL (*f)[m] = (REAL(*)[m])f_p;
+
 	/*
 	 * Initialize coefficients */
 	/* X-direction coef */
@@ -319,6 +319,10 @@ void jacobi_cuda(long n, long m, REAL dx, REAL dy, REAL alpha, REAL omega, REAL 
 	 * will be calculated (see below), a [n][m] array or a one-element array need to be allocated as well. */
 	int size = n * m * sizeof(REAL);
 
+	// malloc for error
+	REAL error;
+	cudaMalloc(&d_error, sizeof(REAL));
+
 	// malloc and memcpy for u
 	REAL d_u;
 	cudaMalloc(&d_u, size);
@@ -330,20 +334,21 @@ void jacobi_cuda(long n, long m, REAL dx, REAL dy, REAL alpha, REAL omega, REAL 
 	cudaMemcpy(d_f, f, size, cudaMemcpyHostToDevice);
 
 	// malloc for uold
-	cudaMalloc(&uold, size);
+	REAL d_uold;
+	cudaMalloc(&d_uold, size);
 
 	// malloc for error
 	REAL d_error;
 	cudaMalloc( &d_error, sizeof(REAL) );
 	cudaMemcpy(d_error, error, sizeof(REAL), cudaMemcpyHostToDevice);
-	
+
 	while ((k <= mits) && (d_error > tol)) {
 		d_error = 0.0;
 
 		/* TODO #3: swap u and uold */
 		for (i = 0; i < n; i++) {
 			for (j = 0; j < m; j++) {
-				uold[i][j] = d_u[i][j];
+				d_uold[i][j] = d_u[i][j];
 			}
 		}
 		
@@ -352,7 +357,7 @@ void jacobi_cuda(long n, long m, REAL dx, REAL dy, REAL alpha, REAL omega, REAL 
 		dim3 dimGrid(N / dimBlock.x, N / dimBlock.y);
 
 		/* TODO #5: launch jacobi_kernel */
-        jacobi_kernel<<<dimGrid, dimBlock>>>()
+        jacobi_kernel<<<dimGrid, dimBlock>>>(n, m, ax, ay, b, omega, d_u, d_f, resid, d_error);
 
 		/* TODO #6: compute error on CPU or GPU. error is calculated by accumulating
 		 *          resid*resid computed by each thread. There are multiple approaches to compute the error. E.g. 1). A array of resid[n][m]
@@ -360,6 +365,8 @@ void jacobi_cuda(long n, long m, REAL dx, REAL dy, REAL alpha, REAL omega, REAL 
 		 *          accumulated on either CPU or GPU. 2). A simpler implementation could be just using CUDA atomicAdd, check. 
 		 *          (http://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#atomic-functions
 		 */
+
+		/*
 		for (i = 1; i < (n - 1); i++)
 			for (j = 1; j < (m - 1); j++) {
 				resid = (ax * (uold[i - 1][j] + uold[i + 1][j]) + ay * (uold[i][j - 1] + uold[i][j + 1]) + b * uold[i][j] - f[i][j]) / b;
@@ -368,14 +375,23 @@ void jacobi_cuda(long n, long m, REAL dx, REAL dy, REAL alpha, REAL omega, REAL 
 				u[i][j] = uold[i][j] - omega * resid;
 				error = error + resid * resid;
 			}
+		*/
 
 		/* Error check */
 		/* TODO #7: copy the error from GPU to CPU */
+		cudaMemcpy(d_error, error, sizeof(REAL), cudaMemcpyDeviceToHost);
+
 		if (k % 500 == 0)	printf("Finished %ld iteration with error: %g\n", k, error);
 		error = sqrt(error) / (n * m);
 		k = k + 1;
 	} /*  End iteration loop */
+
 	/* TODO #8: GPU memory deallocation */
+	cudaFree(d_u);
+	cudaFree(d_f);
+	cudaFree(d_uold);
+	cudaFree(d_error);
+    
 	printf("Total Number of Iterations: %ld\n", k);
 	printf("Residual: %.15g\n", error);
 }
