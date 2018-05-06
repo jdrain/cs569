@@ -157,8 +157,8 @@ void matmul_openmp(int N, REAL *A, REAL *B, REAL *C, int num_tasks) {
   */
 __global__ void matmul_cuda_v1_vanilla_kernel(int N, REAL *A, REAL *B, REAL *C ) {
     float C_val = 0.0;
-    int row = BlockIdx.y * BlockDim.y + ThreadIdx.y;
-    int col = BlockIdx.x * BlockDim.x + ThreadIdx.x;
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
     for ( int i = 0; i < N; i++ ) {
         C_val += A[row * N + i] * B[i * N + col];
     }
@@ -171,18 +171,18 @@ __global__ void matmul_cuda_v1_vanilla_kernel(int N, REAL *A, REAL *B, REAL *C )
 void matmul_cuda_v1_vanilla(int N, REAL *A, REAL *B, REAL *C) {
 
     // Copy A to device memory
-    const REAL d_A;
+    REAL * d_A;
     int size = N * N * sizeof(float);
     cudaMalloc(&d_A, size);
     cudaMemcpy(d_A, A, size, cudaMemcpyHostToDevice);
 
     // Copy B to device memory
-    const REAL d_B;
+    REAL * d_B;
     cudaMalloc(&d_B, size);
     cudaMemcpy(d_B, B, size, cudaMemcpyHostToDevice);
 
     // Malloc for C
-    const REAL d_C;
+    REAL * d_C;
     cudaMalloc(&d_C, size);
 
     // Invoke kernel function
@@ -198,7 +198,7 @@ void matmul_cuda_v1_vanilla(int N, REAL *A, REAL *B, REAL *C) {
 }
 
 // helper for shmem_kernel
-__device__ REAL GetSubMatrix( REAL *A, int row, int col, int width ) {
+__device__ REAL * GetSubMatrix( REAL *A, int row, int col, int width ) {
     return &A[ row * width + col * BLOCK_SIZE ];
 }
 
@@ -209,7 +209,7 @@ __device__ void SetElement( REAL *A, int row, int col, int width, float value ) 
 
 // helper for shmem_kernel
 __device__ REAL GetElement( REAL *A, int row, int col, int width ) {
-    return A[ row * width + col ]
+    return A[ row * width + col ];
 }
 
 /** 
@@ -276,18 +276,18 @@ __global__ void matmul_cuda_v1_shmem_kernel( int N, REAL *A, REAL *B, REAL *C ) 
 void matmul_cuda_v1_shmem(int N, REAL *A, REAL *B, REAL *C) {
 
     // Copy A to device memory
-    const REAL d_A;
+    REAL * d_A;
     int size = N * N * sizeof( REAL );
     cudaMalloc(&d_A, size);
     cudaMemcpy(d_A, A, size, cudaMemcpyHostToDevice);
 
     // Copy B to device memory
-    const REAL d_B;
+    REAL * d_B;
     cudaMalloc(&d_B, size);
     cudaMemcpy(d_B, B, size, cudaMemcpyHostToDevice);
 
     // Malloc for C
-    const REAL d_C;
+    REAL * d_C;
     cudaMalloc(&d_C, size);
 
     // Invoke kernel function
@@ -311,24 +311,29 @@ void matmul_cuda_v1_shmem(int N, REAL *A, REAL *B, REAL *C) {
  //             matrix_size.uiWB, matrix_size.uiHA, matrix_size.uiWA, &alpha, d_B, matrix_size.uiWB, d_A,
  //             matrix_size.uiWA, &beta, d_C, matrix_size.uiWA)
 void matmul_cuda_v1_cublas(int N, REAL *A, REAL *B, REAL *C) {
+
+    // initialize cublas resources
+    cublasHandle_t handle;
+    cublasCreate(&handle);
+
     REAL alpha, beta = 1.0;
 
     // Copy A to device memory
-    const REAL d_A;
+    REAL * d_A;
     int size = N * N * sizeof( REAL );
     cudaMalloc(&d_A, size);
     cudaMemcpy(d_A, A, size, cudaMemcpyHostToDevice);
 
     // Copy B to device memory
-    const REAL d_B;
+    REAL * d_B;
     cudaMalloc(&d_B, size);
     cudaMemcpy(d_B, B, size, cudaMemcpyHostToDevice);
 
     // Malloc for C
-    const REAL d_C;
+    REAL * d_C;
     cudaMalloc(&d_C, size);
 
-    cublasSgemm(cublas_handle, CUBLAS_OP_N, CUBLAS_OP_N, 
+    cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, 
                 N, N, N,
                 &alpha, d_B, N, d_A,
                 N, &beta, d_C, N);
@@ -339,5 +344,8 @@ void matmul_cuda_v1_cublas(int N, REAL *A, REAL *B, REAL *C) {
     // Free memory on GPU
     cudaFree(d_C);
     cudaFree(d_B);
-    cudaFree(d_A);   
+    cudaFree(d_A); 
+
+    // Free resources associated with cublas
+    cublasDestroy(handle);  
 }
