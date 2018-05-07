@@ -193,7 +193,7 @@ void matmul_cuda_v1_vanilla(int N, REAL *A, REAL *B, REAL *C) {
     dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
     dim3 dimGrid(N / dimBlock.x, N / dimBlock.y);
     matmul_cuda_v1_vanilla_kernel<<<dimGrid, dimBlock>>>(N, d_A, d_B, d_C);
-    
+
     cudaMemcpy(C, d_C, size, cudaMemcpyDeviceToHost);
 
     cudaFree(d_A);
@@ -295,6 +295,7 @@ void matmul_cuda_v1_shmem(int N, REAL *A, REAL *B, REAL *C) {
     REAL * d_C;
     cudaMalloc(&d_C, size);
 
+
     // Invoke kernel function
     dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
     dim3 dimGrid(N/ dimBlock.x, N / dimBlock.y);
@@ -352,5 +353,5 @@ void matmul_cuda_v1_cublas(int N, REAL *A, REAL *B, REAL *C) {
     cudaFree(d_A); 
 
     // Free resources associated with cublas
-    cublasDestroy(handle);  
+    cublasDestroy(handle);
 }
