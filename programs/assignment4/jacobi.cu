@@ -5,6 +5,7 @@
 #include <sys/timeb.h>
 #define REAL float
 
+int BLOCK_SIZE = 16;
 
 /* compile the program using the following command
  *    nvcc jacobi.cu -lpthread -o jacobi
@@ -127,7 +128,6 @@ void jacobi_seq(long n, long m, REAL dx, REAL dy, REAL alpha, REAL relax, REAL *
 void jacobi_cuda(long n, long m, REAL dx, REAL dy, REAL alpha, REAL relax, REAL * u_p, REAL * f_p, REAL tol, int mits);
 
 int main(int argc, char * argv[]) {
-	int BLOCK_SIZE = 16;
 	long n = DEFAULT_DIMSIZE;
 	long m = DEFAULT_DIMSIZE;
 	REAL alpha = 0.0543;
@@ -271,37 +271,28 @@ void jacobi_seq(long n, long m, REAL dx, REAL dy, REAL alpha, REAL omega, REAL *
  * TODO #1: jacobi_kernel implementation of the double-nested loop for computation
  */
 
-/*
- for (i = 1; i < (n - 1); i++)
-	for (j = 1; j < (m - 1); j++) {
-		resid = (ax * (uold[i - 1][j] + uold[i + 1][j]) + ay * (uold[i][j - 1] + uold[i][j + 1]) + b * uold[i][j] - f[i][j]) / b;
+ __global__ void jacobi_kernel(long n, long m, REAL ax, REAL ay, REAL b, REAL omega, REAL * u, REAL * f, REAL * uold, float resid, float * d_error) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
 
-		u[i][j] = uold[i][j] - omega * resid;
-		error = error + resid * resid;
- }
-*/
-
-__global__ void jacobi_kernel(long n, long m, REAL ax, REAL ay, REAL b, REAL omega, REAL * u, REAL * f, REAL * uold, float * resid, float * d_error) {
-	for ( int i = 1; i < (n - 1); i++ ) {
-	    for ( int j = 1; j < (m - 1); j++ ) {
-			// do stuff
-			resid = (ax * (uold[i - 1][j] + uold[i + 1][j]) + ay * (uold[i][j - 1] + uold[i][j + 1]) + b * uold[i][j] - f[i][j]) / b;
-	
-			u[i][j] = uold[i][j] - omega * resid;
-			d_error = atomicAdd_system(&d_error, resid * resid);
-		}
-	}
+    // do stuff
+    resid = (ax * (uold[(i - 1)*n+j] + uold[(i + 1)*n+j]) + ay * (uold[i*n+j-1] + uold[i*n+j+1]) + b * uold[i*n+j] - f[i*n+j]) / b;
+    u[i*n+j] = uold[i*n+j] - omega * resid;
+    REAL resid_squared = resid * resid;
+    atomicAdd(d_error, resid_squared);
 }
 
 void jacobi_cuda(long n, long m, REAL dx, REAL dy, REAL alpha, REAL omega, REAL * u_p, REAL * f_p, REAL tol, int mits) {
+        printf("entered jacobi cuda function\n");
+
 	long i, j, k;
 	REAL ax;
 	REAL ay;
 	REAL b;
 	REAL resid;
-	REAL uold[n][m];
-	REAL error;
-    REAL (*u)[m] = (REAL(*)[m])u_p;
+	REAL * uold;
+	REAL * error;
+        REAL (*u)[m] = (REAL(*)[m])u_p;
 	REAL (*f)[m] = (REAL(*)[m])f_p;
 
 	/*
@@ -312,16 +303,14 @@ void jacobi_cuda(long n, long m, REAL dx, REAL dy, REAL alpha, REAL omega, REAL 
 	ay = (1.0 / (dy * dy));
 	/* Central coeff */
 	b = (((-2.0 / (dx * dx)) - (2.0 / (dy * dy))) - alpha);
-	error = (10.0 * tol);
+	// error = (10.0 * tol);
 	k = 1;
 
 	/* TODO #2: CUDA memory allocation for u, f and uold and copy data for u and f from host memory to GPU memory, depending on how error
 	 * will be calculated (see below), a [n][m] array or a one-element array need to be allocated as well. */
 	int size = n * m * sizeof(REAL);
-
-	// malloc for error
-	REAL * d_error;
-	cudaMalloc(&d_error, sizeof(REAL));
+        
+        printf("starting malloc with size %d", size);
 
 	// malloc and memcpy for u
 	REAL * d_u;
@@ -341,23 +330,33 @@ void jacobi_cuda(long n, long m, REAL dx, REAL dy, REAL alpha, REAL omega, REAL 
 	REAL * d_error;
 	cudaMalloc( &d_error, sizeof(REAL) );
 	cudaMemcpy(d_error, error, sizeof(REAL), cudaMemcpyHostToDevice);
+        
+        printf("finished malloc for %d different vars", 4);
 
-	while ((k <= mits) && (d_error > tol)) {
-		d_error = 0.0;
+	while ((k <= mits) && (error[0] > tol)) {
+		error[0] = 0.0;
 
 		/* TODO #3: swap u and uold */
+                cudaMemcpy(d_uold, uold, size, cudaMemcpyDeviceToHost);
+                cudaMemcpy(d_u, u, size, cudaMemcpyDeviceToHost);
+
 		for (i = 0; i < n; i++) {
 			for (j = 0; j < m; j++) {
-				d_uold[i * n + j] = d_u[i * n + j];
+				uold[i * n + j] = u[i][j];
 			}
 		}
-		
+
+                cudaMemcpy(d_uold, uold, size, cudaMemcpyHostToDevice);
+                cudaMemcpy(d_u, u, size, cudaMemcpyHostToDevice);
+
+	        printf("Memory swapped\n");
+
 		/* TODO #4: set 16x16 threads/block and n/16 x m/16 blocks/grid for GPU computation (assuming n and m are dividable by 16 */
 		dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
-		dim3 dimGrid(N / dimBlock.x, N / dimBlock.y);
+		dim3 dimGrid(n / dimBlock.x, n / dimBlock.y);
 
 		/* TODO #5: launch jacobi_kernel */
-        jacobi_kernel<<<dimGrid, dimBlock>>>(n, m, ax, ay, b, omega, &d_u, &d_f, &uold, resid, &d_error);
+		jacobi_kernel<<<dimGrid, dimBlock>>>(n, m, ax, ay, b, omega, d_u, d_f, d_uold, resid, d_error);
 
 		/* TODO #6: compute error on CPU or GPU. error is calculated by accumulating
 		 *          resid*resid computed by each thread. There are multiple approaches to compute the error. E.g. 1). A array of resid[n][m]
@@ -379,10 +378,11 @@ void jacobi_cuda(long n, long m, REAL dx, REAL dy, REAL alpha, REAL omega, REAL 
 
 		/* Error check */
 		/* TODO #7: copy the error from GPU to CPU */
-		cudaMemcpy(d_error, error, sizeof(REAL), cudaMemcpyDeviceToHost);
+                REAL * final_error;
+		cudaMemcpy(d_error, final_error, sizeof(REAL), cudaMemcpyDeviceToHost);
 
-		if (k % 500 == 0)	printf("Finished %ld iteration with error: %g\n", k, error);
-		error = sqrt(error) / (n * m);
+		if (k % 500 == 0)	printf("Finished %ld iteration with error: %g\n", k, final_error[0]);
+		final_error[0] = sqrt(final_error[0]) / (n * m);
 		k = k + 1;
 	} /*  End iteration loop */
 

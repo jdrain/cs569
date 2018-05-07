@@ -120,6 +120,10 @@ int main(int argc, char *argv[]) {
     printf("------------------------------------------------------------------------------------------------------\n");
     printf("matmul_base:\t\t%4f\t%4f \t\t%g\n", elapsed_base * 1.0e3, ((((2.0 * N) * N) * N) / (1.0e6 * elapsed_base)), maxerror(N, N, C_base, C_base));
     printf("matmul_openmp:\t\t%4f\t%4f \t\t%g\n", elapsed_openmp * 1.0e3, ((((2.0 * N) * N) * N) / (1.0e6 * elapsed_openmp)), maxerror(N, N, C_base, C_openmp));
+    printf("matmul_cudav1:\t\t%4f\t%4f \t\t%g\n", elapsed_cuda_v1 * 1.0e3, ((((2.0 * N) * N) * N) / (1.0e6 * elapsed_cuda_v1)), maxerror(N, N, C_base, C_cuda_vanilla));
+    printf("matmul_cudav2:\t\t%4f\t%4f \t\t%g\n", elapsed_cuda_v2 * 1.0e3, ((((2.0 * N) * N) * N) / (1.0e6 * elapsed_cuda_v2)), maxerror(N, N, C_base, C_cuda_shmem));
+    printf("matmul_cudav3:\t\t%4f\t%4f \t\t%g\n", elapsed_cuda_v3 * 1.0e3, ((((2.0 * N) * N) * N) / (1.0e6 * elapsed_cuda_v3)), maxerror(N, N, C_base, C_cuda_cublas));
+
     /* TODO: put other printf statements for outputing results for GPU execution */
     free(heap_buffer);
     return 0;
@@ -216,6 +220,7 @@ __device__ REAL GetElement( REAL *A, int row, int col, int width ) {
   * TODO: kernel implementation 
   */
 __global__ void matmul_cuda_v1_shmem_kernel( int N, REAL *A, REAL *B, REAL *C ) {
+
     // Block row and column
     int blockRow = blockIdx.y;
     int blockCol = blockIdx.x;
